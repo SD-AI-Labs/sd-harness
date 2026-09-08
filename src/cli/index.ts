@@ -2,6 +2,9 @@ import "dotenv/config";
 
 import { ToolRegistry } from "../core/ToolRegistry.js";
 import { ListFilesTool } from "../core/tools/ListFilesTool.js";
+import { ReadFileTool } from "../core/tools/ReadFileTool.js";
+import { WriteFileTool } from "../core/tools/WriteFileTool.js";
+import { EditFileTool } from "../core/tools/EditFileTool.js";
 import { Agent } from "../core/Agent.js";
 import { ConsoleAgentObserver } from "../core/ConsoleAgentObserver.js";
 import { TraceAgentObserver } from "../core/TraceAgentObserver.js";
@@ -23,6 +26,24 @@ const registry =
 
 registry.register(
   new ListFilesTool(),
+);
+
+registry.register(
+  new ReadFileTool(
+    defaultAgentConfig.workingDirectory,
+  ),
+);
+
+registry.register(
+  new WriteFileTool(
+    defaultAgentConfig.workingDirectory,
+  ),
+);
+
+registry.register(
+  new EditFileTool(
+    defaultAgentConfig.workingDirectory,
+  ),
 );
 
 

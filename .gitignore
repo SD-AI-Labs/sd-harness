@@ -1,7 +1,20 @@
-node_modules/
-dist/
+# Environment / secrets
 .env
 .env.*
-!.env.example
-sd-harness.db
+
+# JetBrains
 .idea/
+
+# Build output
+dist/
+
+# Dependencies
+node_modules/
+
+# macOS
+.DS_Store
+
+# Local SQLite database
+*.db
+*.db-shm
+*.db-wal

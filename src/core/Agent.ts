@@ -130,6 +130,22 @@ export class Agent {
           response.content ?? "";
 
 
+        /**
+         * Store the assistant's final answer so
+         * that subsequent turns have the complete
+         * conversation history.
+         */
+        context.messages.push(
+          {
+            role:
+              "assistant",
+
+            content:
+              answer,
+          },
+        );
+
+
         const result:
           AgentResult = {
 

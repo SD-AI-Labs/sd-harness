@@ -13,6 +13,9 @@ import { defaultAgentConfig } from "../core/DefaultAgentConfig.js";
 import { LlmClientFactory } from "../llm/LlmClientFactory.js";
 import type { LlmConfig } from "../llm/LlmConfig.js";
 
+import { AgentSessionManager } from "../memory/AgentSessionManager.js";
+import { SqliteSessionStore } from "../memory/SqliteSessionStore.js";
+
 
 const registry =
   new ToolRegistry();
@@ -80,43 +83,123 @@ const agent =
   );
 
 
-const result =
-  await agent.run(
-    "List files in the current directory",
+const store =
+  new SqliteSessionStore();
+
+
+const sessionManager =
+  new AgentSessionManager(
+    agent,
+    store,
   );
+
+
+/*
+ * Minimal argument parsing.
+ *
+ * Usage:
+ *   node index.ts "prompt"                        → start new session
+ *   node index.ts --continue <sessionId> "prompt" → continue existing session
+ */
+
+const args =
+  process.argv.slice(2);
+
+
+if (args.length === 0) {
+
+  console.error(
+    "Usage:",
+  );
+
+  console.error(
+    "  node index.ts \"prompt\"",
+  );
+
+  console.error(
+    "  node index.ts --continue <sessionId> \"prompt\"",
+  );
+
+  process.exit(1);
+}
+
+
+let sessionId: string | undefined;
+let userInput: string;
+
+if (args[0] === "--continue") {
+
+  if (args.length < 3) {
+
+    console.error(
+      "Error: --continue requires a sessionId and a prompt",
+    );
+
+    process.exit(1);
+  }
+
+  sessionId = args[1];
+  userInput = args[2];
+
+} else {
+
+  userInput = args[0];
+}
+
+
+/*
+ * Execute via session manager.
+ */
+
+let result;
+
+if (sessionId) {
+
+  console.log(
+    `Continuing session: ${sessionId}`,
+  );
+
+  result =
+    await sessionManager.continue(
+      sessionId,
+      userInput,
+    );
+
+} else {
+
+  result =
+    await sessionManager.start(
+      userInput,
+    );
+}
 
 
 console.log(
   "\nAnswer:",
 );
 
-
 console.log(
-  result.answer,
+  result.result.answer,
 );
-
 
 console.log(
   "\nRun information:",
 );
 
-
 console.log({
   sessionId:
-    result.sessionId,
+    result.result.sessionId,
 
   iterations:
-    result.iterations,
+    result.result.iterations,
 
   durationMs:
-    result.durationMs,
+    result.result.durationMs,
 });
-
 
 console.log(
   "\nTrace:",
 );
-
 
 console.log(
   traceObserver.getTrace(),

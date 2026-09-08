@@ -12,7 +12,11 @@ The project currently supports:
 - Tool registration and execution
 - Iterative agent execution
 - Multi-step tool-calling loops
+- File tools: read, write, edit, and list files
+- Path-safe file access sandboxed to a working directory
 - Conversation context management
+- Persistent conversation sessions (SQLite)
+- Session resume across processes (`--continue`)
 - Agent events and observers
 - Execution tracing
 - Provider-independent request and response models
@@ -144,6 +148,52 @@ The assistant tool call and tool result are preserved in conversation history be
 
 ---
 
+# Session Persistence
+
+Conversations can be saved to disk and resumed later, including across separate processes.
+
+```text
+CLI (start / --continue)
+          │
+          ▼
+AgentSessionManager
+          │
+          ├──► Agent
+          │
+          └──► SessionStore (interface)
+                    │
+                    └──► SqliteSessionStore
+                              │
+                              └──► SQLite (better-sqlite3)
+```
+
+The session manager persists the full conversation state:
+
+```text
+start(input)
+  → create a session context
+  → run the agent
+  → save the context
+
+continue(sessionId, input)
+  → load the saved context
+  → append the user message
+  → run the agent
+  → save the context again
+```
+
+The complete `AgentContext` — including assistant tool calls and tool results — is serialized into the SQLite `sessions` table, so a resumed conversation has its full history available.
+
+The CLI starts a new session by default and resumes an existing one with `--continue`:
+
+```bash
+pnpm dev -- "list the files in this project"
+
+pnpm dev -- --continue <sessionId> "now read the readme"
+```
+
+---
+
 # Project Structure
 
 ```text
@@ -172,23 +222,34 @@ sd-harness
 │   │   ├── TraceAgentObserver.ts
 │   │   │
 │   │   └── tools
-│   │       └── ListFilesTool.ts
+│   │       ├── EditFileTool.ts
+│   │       ├── ListFilesTool.ts
+│   │       ├── ReadFileTool.ts
+│   │       ├── WriteFileTool.ts
+│   │       └── pathSecurity.ts
 │   │
 │   ├── context
 │   │   ├── ContextManager.ts
 │   │   └── SimpleContextManager.ts
 │   │
-│   └── llm
-│       ├── DeepSeekLlmClient.ts
-│       ├── FakeLlmClient.ts
-│       ├── LlmClient.ts
-│       ├── LlmClientFactory.ts
-│       ├── LlmConfig.ts
-│       ├── LlmResponse.ts
-│       ├── OpenAiLlmClient.ts
-│       ├── OpenAiMessageConverter.ts
-│       ├── OpenAiResponseMapper.ts
-│       └── OpenAiToolConverter.ts
+│   ├── llm
+│   │   ├── DeepSeekLlmClient.ts
+│   │   ├── FakeLlmClient.ts
+│   │   ├── LlmClient.ts
+│   │   ├── LlmClientFactory.ts
+│   │   ├── LlmConfig.ts
+│   │   ├── LlmResponse.ts
+│   │   ├── OpenAiLlmClient.ts
+│   │   ├── OpenAiMessageConverter.ts
+│   │   ├── OpenAiResponseMapper.ts
+│   │   ├── OpenAiToolConverter.ts
+│   │   └── ScriptedFakeLlmClient.ts
+│   │
+│   └── memory
+│       ├── AgentSessionManager.ts
+│       ├── SessionStore.ts
+│       ├── SqliteSessionStore.ts
+│       └── database.ts
 │
 ├── tests
 │
@@ -292,9 +353,17 @@ The current implementation includes:
 
 ```text
 list_files
+read_file
+write_file
+edit_file
 ```
 
-The tool allows the agent to inspect files and directories.
+All file tools are restricted to the agent's working directory (`AgentConfig.workingDirectory`, which defaults to `process.cwd()`). Absolute paths, `..` traversal, and symlinks that point outside the working directory are rejected before any file is touched.
+
+- `read_file` — reads a UTF-8 text file; fails clearly for missing files and directories.
+- `write_file` — creates or overwrites a text file, creating parent directories as needed.
+- `edit_file` — replaces a block of text; the old text must match exactly once, otherwise the edit fails clearly (missing or ambiguous).
+- `list_files` — lists files and directories at a path.
 
 Tool execution is handled by:
 
@@ -311,10 +380,9 @@ The executor provides a centralized location for handling:
 Future tools may include:
 
 ```text
-read_file
-write_file
 search_files
 run_command
+web_search
 ```
 
 Additional safety controls will be required before destructive or system-level tools are introduced.
@@ -511,12 +579,15 @@ Run tests in watch mode:
 pnpm test:watch
 ```
 
-The project includes tests for core components such as:
+The project includes 45 tests across 15 files for core components such as:
 
-- Fake LLM client
-- Tool implementations
+- Fake and scripted fake LLM clients
+- Tool implementations (list, read, write, and edit file)
+- File-tool path safety (absolute paths, traversal, symlink escape)
 - Tool schema conversion
 - Agent tool-calling loop
+- Agent invocation of file tools
+- Session manager and SQLite session store
 - OpenAI response mapping
 - OpenAI message conversion
 - OpenAI tool conversion
@@ -558,6 +629,16 @@ Completed:
 
 ✓ Tool error handling
 
+✓ File tools: list_files, read_file, write_file, edit_file
+
+✓ Working-directory sandbox for file tools
+
+✓ Persistent sessions (SQLite)
+
+✓ Session resume across processes (--continue)
+
+✓ Session manager (start / continue / getSession)
+
 ✓ Canonical conversation model
 
 ✓ Assistant tool-call preservation
@@ -596,19 +677,22 @@ Completed:
 
 ## Tools
 
-- [ ] Read file tool
-- [ ] Write file tool
+- [x] Read file tool
+- [x] Write file tool
+- [x] Edit file tool
 - [ ] Search files tool
 - [ ] Command execution tool
+- [ ] Web access tools
 - [ ] Tool permission policies
-- [ ] Workspace boundaries
+- [x] Workspace boundaries for file tools
 - [ ] Dangerous operation controls
+- [ ] Shell / command sandboxing
 
 ## Conversation
 
-- [ ] Persistent conversation storage
-- [ ] SQLite-backed sessions
-- [ ] Conversation resume support
+- [x] Persistent conversation storage
+- [x] SQLite-backed sessions
+- [x] Conversation resume support
 - [ ] Conversation summarization
 - [ ] Token-aware context management
 

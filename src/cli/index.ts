@@ -49,7 +49,7 @@ registry.register(
 
 const contextManager =
   new SimpleContextManager(
-    20,
+    defaultAgentConfig.contextPolicy,
   );
 
 

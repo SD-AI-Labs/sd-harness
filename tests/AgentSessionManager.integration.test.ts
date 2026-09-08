@@ -33,7 +33,9 @@ describe("AgentSessionManager + SqliteSessionStore integration", () => {
       startLlm,
       registry,
       defaultAgentConfig,
-      new SimpleContextManager(20),
+      new SimpleContextManager({
+        maxMessages: 20,
+      }),
     );
 
     const store = new SqliteSessionStore();
@@ -65,7 +67,9 @@ describe("AgentSessionManager + SqliteSessionStore integration", () => {
       continueLlm,
       registry,
       defaultAgentConfig,
-      new SimpleContextManager(20),
+      new SimpleContextManager({
+        maxMessages: 20,
+      }),
     );
 
     const continueManager = new AgentSessionManager(continueAgent, store);

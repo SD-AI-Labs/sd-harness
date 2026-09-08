@@ -6,6 +6,7 @@ import type { SessionStore } from "../src/memory/SessionStore.js";
 
 import { Agent } from "../src/core/Agent.js";
 import { FakeLlmClient } from "../src/llm/FakeLlmClient.js";
+import { ScriptedFakeLlmClient } from "../src/llm/ScriptedFakeLlmClient.js";
 import { ToolRegistry } from "../src/core/ToolRegistry.js";
 import { defaultAgentConfig } from "../src/core/DefaultAgentConfig.js";
 import { SimpleContextManager } from "../src/context/SimpleContextManager.js";
@@ -57,7 +58,9 @@ describe(
             new FakeLlmClient(),
             registry,
             defaultAgentConfig,
-            new SimpleContextManager(),
+            new SimpleContextManager({
+              maxMessages: 20,
+            }),
           );
 
 
@@ -112,6 +115,123 @@ describe(
           second.context.sessionId,
         ).toBe(
           first.context.sessionId,
+        );
+      },
+    );
+
+    it(
+      "keeps a persisted session valid under a small context window",
+      async () => {
+        const registry =
+          new ToolRegistry();
+
+        const llm =
+          new ScriptedFakeLlmClient([
+            {
+              content: "answer one",
+            },
+            {
+              content: "answer two",
+            },
+            {
+              content: "answer three",
+            },
+          ]);
+
+        const agent =
+          new Agent(
+            llm,
+            registry,
+            defaultAgentConfig,
+            new SimpleContextManager({
+              maxMessages: 3,
+            }),
+          );
+
+        const store =
+          new FakeSessionStore();
+
+        const sessions =
+          new AgentSessionManager(
+            agent,
+            store,
+          );
+
+        const first =
+          await sessions.start(
+            "First message",
+          );
+
+        const sessionId =
+          first.result.sessionId;
+
+        await sessions.continue(
+          sessionId,
+          "Second message",
+        );
+
+        const third =
+          await sessions.continue(
+            sessionId,
+            "Third message",
+          );
+
+        expect(
+          third.result.answer,
+        ).toBe(
+          "answer three",
+        );
+
+        /*
+         * The persisted history stays complete even though the
+         * requests sent to the LLM were truncated.
+         */
+        const persisted =
+          store.load(
+            sessionId,
+          )!;
+
+        expect(
+          persisted.messages.length,
+        ).toBe(6);
+
+        expect(
+          persisted.messages[0],
+        ).toEqual({
+          role: "user",
+          content: "First message",
+        });
+
+        /*
+         * The last LLM request was truncated to the newest
+         * exchange that fits the policy: the oldest user message
+         * is gone but the latest user turn is retained.
+         */
+        const requests =
+          llm.getRequests();
+
+        expect(
+          requests.length,
+        ).toBe(3);
+
+        const lastRequestMessages =
+          requests[2][0].map(
+            (message) =>
+              message.content,
+          );
+
+        expect(
+          lastRequestMessages,
+        ).toEqual([
+          "Second message",
+          "answer two",
+          "Third message",
+        ]);
+
+        expect(
+          lastRequestMessages,
+        ).not.toContain(
+          "First message",
         );
       },
     );

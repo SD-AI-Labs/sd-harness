@@ -14,7 +14,8 @@ The project currently supports:
 - Multi-step tool-calling loops
 - File tools: read, write, edit, and list files
 - Path-safe file access sandboxed to a working directory
-- Conversation context management
+- Conversation context management with an explicit, configurable policy
+- Structure-preserving context truncation (system message, tool rounds intact)
 - Persistent conversation sessions (SQLite)
 - Session resume across processes (`--continue`)
 - Agent events and observers
@@ -399,7 +400,23 @@ The current implementation is:
 SimpleContextManager
 ```
 
-It limits the number of messages sent to the LLM.
+The behavior is controlled by an explicit, configurable policy rather than an implicit truncation rule:
+
+```typescript
+export interface ContextPolicy {
+  maxMessages: number;
+}
+```
+
+The policy lives on `AgentConfig.contextPolicy` (default `{ maxMessages: 20 }` in `DefaultAgentConfig`). Only the copy sent to the LLM is trimmed — persisted sessions keep their full history.
+
+Truncation is structure-preserving:
+
+- leading system messages are always retained;
+- messages are grouped into exchanges at user boundaries;
+- an assistant tool-call message and the tool results answering it are kept together as one atomic unit, so no orphaned tool results or unanswered tool calls survive truncation;
+- the newest exchanges that fit the policy are retained;
+- if the newest exchange alone exceeds the budget, it is trimmed between complete tool rounds.
 
 Conceptually:
 
@@ -410,18 +427,21 @@ Full Conversation
 ContextManager
        │
        ▼
-Relevant Recent Messages
+Newest Exchanges That Fit the Policy
        │
        ▼
 LLM
 ```
 
+The policy is intentionally provider-independent: message counts rather than tokens, because the runtime has no token-counting infrastructure.
+
 Future versions may support:
 
+- Token-aware context limits
 - Conversation summarization
+- Truncation signals visible to the agent
 - Long-term memory
 - Semantic retrieval
-- Token-aware context limits
 
 ---
 
@@ -579,7 +599,7 @@ Run tests in watch mode:
 pnpm test:watch
 ```
 
-The project includes 45 tests across 15 files for core components such as:
+The project includes 57 tests across 16 files for core components such as:
 
 - Fake and scripted fake LLM clients
 - Tool implementations (list, read, write, and edit file)
@@ -587,7 +607,9 @@ The project includes 45 tests across 15 files for core components such as:
 - Tool schema conversion
 - Agent tool-calling loop
 - Agent invocation of file tools
+- Context policy and structure-preserving truncation
 - Session manager and SQLite session store
+- Session continuation under a small context window
 - OpenAI response mapping
 - OpenAI message conversion
 - OpenAI tool conversion
@@ -644,6 +666,10 @@ Completed:
 ✓ Assistant tool-call preservation
 
 ✓ Tool result association
+
+✓ Explicit context policy (ContextPolicy.maxMessages)
+
+✓ Structure-preserving context truncation
 
 ✓ Context management
 

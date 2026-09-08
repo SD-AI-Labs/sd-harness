@@ -32,7 +32,9 @@ describe("Agent file tool invocation", () => {
       llm,
       tools,
       defaultAgentConfig,
-      new SimpleContextManager(20),
+      new SimpleContextManager({
+        maxMessages: 20,
+      }),
     );
   }
 

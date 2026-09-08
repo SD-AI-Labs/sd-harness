@@ -4,4 +4,7 @@ export const defaultAgentConfig: AgentConfig = {
   maxIterations: 5,
   toolTimeoutMs: 10000,
   workingDirectory: process.cwd(),
+  contextPolicy: {
+    maxMessages: 20,
+  },
 };

@@ -79,9 +79,9 @@ describe(
             llm,
             registry,
             defaultAgentConfig,
-            new SimpleContextManager(
-              20,
-            ),
+            new SimpleContextManager({
+              maxMessages: 20,
+            }),
           );
 
 

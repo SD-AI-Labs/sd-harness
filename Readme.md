@@ -16,6 +16,8 @@ The project currently supports:
 - Path-safe file access sandboxed to a working directory
 - Conversation context management with an explicit, configurable policy
 - Structure-preserving context truncation (system message, tool rounds intact)
+- Configurable system prompt / agent identity (default + custom)
+- System instructions kept separate from persisted conversation history
 - Persistent conversation sessions (SQLite)
 - Session resume across processes (`--continue`)
 - Agent events and observers
@@ -195,6 +197,38 @@ pnpm dev -- --continue <sessionId> "now read the readme"
 
 ---
 
+# Agent Identity and System Prompt
+
+The agent's identity and behavior rules come from a configurable system prompt, not from hard-coded instructions in the loop.
+
+The prompt is configured on `AgentConfig.systemPrompt`. A sensible default for sd-harness as a local coding agent is provided by `DefaultAgentConfig` (exported as `defaultSystemPrompt`): it establishes that the agent is a software development assistant, operates inside the configured working directory, uses tools for real filesystem/project information, never claims actions it did not perform, reports tool failures accurately, does not invent tool results, explains actions concisely, and respects the working-directory boundary.
+
+A custom prompt replaces the default entirely:
+
+```typescript
+const config: AgentConfig = {
+  ...defaultAgentConfig,
+  systemPrompt: "You are my release-notes assistant...",
+};
+```
+
+Each request is sent to the LLM as a proper `system` message, composed by `buildSystemMessage(config)` from the configured instructions plus the configured working directory:
+
+```text
+system:
+  <configured instructions>
+  Working directory: <AgentConfig.workingDirectory>
+```
+
+Key properties:
+
+- **Working directory** — the value comes from the existing `AgentConfig.workingDirectory` (Milestone 2); it is surfaced to the model in the system message. There is no second working-directory configuration.
+- **Separation from persistence** — the system message is never pushed into `AgentContext.messages`, so SQLite stores only user/assistant/tool conversation history. When a session is resumed, the current prompt is re-applied from the agent config on top of the restored history.
+- **Interaction with context management** — the system message is prepended *after* `ContextManager.prepare()` truncates the conversation, so truncation can never remove it. The `contextPolicy.maxMessages` budget applies to conversation messages.
+- **Provider independence** — the composition happens on the runtime's own `Message` model; providers just receive a standard system message.
+
+---
+
 # Project Structure
 
 ```text
@@ -217,6 +251,7 @@ sd-harness
 │   │   ├── DefaultAgentConfig.ts
 │   │   ├── LlmToolDefinition.ts
 │   │   ├── Message.ts
+│   │   ├── SystemPrompt.ts
 │   │   ├── ToolExecutor.ts
 │   │   ├── ToolRegistry.ts
 │   │   ├── ToolSchemaConverter.ts
@@ -599,7 +634,7 @@ Run tests in watch mode:
 pnpm test:watch
 ```
 
-The project includes 57 tests across 16 files for core components such as:
+The project includes 65 tests across 17 files for core components such as:
 
 - Fake and scripted fake LLM clients
 - Tool implementations (list, read, write, and edit file)
@@ -608,6 +643,7 @@ The project includes 57 tests across 16 files for core components such as:
 - Agent tool-calling loop
 - Agent invocation of file tools
 - Context policy and structure-preserving truncation
+- System prompt composition, separation, and persistence behavior
 - Session manager and SQLite session store
 - Session continuation under a small context window
 - OpenAI response mapping
@@ -670,6 +706,12 @@ Completed:
 ✓ Explicit context policy (ContextPolicy.maxMessages)
 
 ✓ Structure-preserving context truncation
+
+✓ Configurable system prompt (default + custom)
+
+✓ Agent identity sent as a proper system message
+
+✓ System prompt kept out of persisted history
 
 ✓ Context management
 

@@ -11,6 +11,7 @@ import type { ContextManager } from "../context/ContextManager.js";
 import { ToolSchemaConverter } from "./ToolSchemaConverter.js";
 import { ToolExecutor } from "./ToolExecutor.js";
 import { AgentContextFactory } from "./AgentContextFactory.js";
+import { buildSystemMessage } from "./SystemPrompt.js";
 
 
 export class Agent {
@@ -74,6 +75,18 @@ export class Agent {
     );
 
 
+    /**
+     * Compose the system message once per run, from the agent config.
+     * It is prepended to each request after context preparation, so it
+     * survives truncation and is never stored with the persisted
+     * conversation history.
+     */
+    const systemMessage =
+      buildSystemMessage(
+        this.config,
+      );
+
+
     for (
       let iteration = 0;
       iteration <
@@ -92,11 +105,19 @@ export class Agent {
       );
 
 
+      /**
+       * The system message is sent ahead of the prepared conversation
+       * on every LLM request.
+       */
       const response =
         await this.llm.chat(
-          this.contextManager.prepare(
-            context.messages,
-          ),
+          [
+            systemMessage,
+
+            ...this.contextManager.prepare(
+              context.messages,
+            ),
+          ],
 
           this.tools
             .list()

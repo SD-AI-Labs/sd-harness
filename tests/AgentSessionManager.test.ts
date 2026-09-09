@@ -205,7 +205,8 @@ describe(
         /*
          * The last LLM request was truncated to the newest
          * exchange that fits the policy: the oldest user message
-         * is gone but the latest user turn is retained.
+         * is gone but the latest user turn is retained. The
+         * request leads with the agent's system message.
          */
         const requests =
           llm.getRequests();
@@ -214,11 +215,26 @@ describe(
           requests.length,
         ).toBe(3);
 
+        const lastRequest =
+          requests[2][0];
+
+        expect(
+          lastRequest[0].role,
+        ).toBe(
+          "system",
+        );
+
         const lastRequestMessages =
-          requests[2][0].map(
-            (message) =>
-              message.content,
-          );
+          lastRequest
+            .filter(
+              (message) =>
+                message.role !==
+                "system",
+            )
+            .map(
+              (message) =>
+                message.content,
+            );
 
         expect(
           lastRequestMessages,

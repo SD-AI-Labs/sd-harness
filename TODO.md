@@ -1,37 +1,45 @@
-# TODO — Milestone 3 follow-ups
+# TODO — Milestone 4 follow-ups
 
-Status of Milestone 3 (Context Management): implemented and verified
-(57 tests pass, tsc build clean) but intentionally NOT committed yet.
+Status of Milestone 4 (Agent Identity & System Prompt): implemented and
+verified (65 tests pass, tsc build clean) but intentionally NOT committed
+yet. Milestones 1–3 are committed (M3 in 4e91ae7).
 
-## Finish the milestone
+## Finish Milestone 4
 
-- [ ] Review the uncommitted Milestone 3 diff
-      (8 modified + 1 new file, listed below)
-- [ ] Commit the Milestone 3 changes once reviewed
+- [ ] Review the uncommitted Milestone 4 diff (files below)
+- [ ] Commit the Milestone 4 changes once reviewed
 
 Files awaiting commit:
 
 ```text
-M src/cli/index.ts
-M src/context/SimpleContextManager.ts
+M src/core/Agent.ts
 M src/core/AgentConfig.ts
 M src/core/DefaultAgentConfig.ts
-M tests/AgentFileToolInvocation.test.ts
-M tests/AgentSessionManager.integration.test.ts
+A src/core/SystemPrompt.ts
 M tests/AgentSessionManager.test.ts
-M tests/AgentToolLoop.test.ts
-?? tests/SimpleContextManager.test.ts
+A tests/AgentSystemPrompt.test.ts
+M TODO.md
+M Readme.md
+M PROJECT_STATE.md
 ```
 
-## Docs
+## Milestone 4 limitations discovered during implementation
 
-- [ ] Update Readme.md for Milestone 3:
-      contextPolicy config, structure-preserving truncation, test count
-      (now 57 tests / 16 files)
-- [ ] Sync PROJECT_STATE.md — still stale from before Milestone 1
-      (sessions are wired into the CLI; file tools exist)
+- [ ] Decide whether the system message should count against
+      contextPolicy.maxMessages — today the policy budgets conversation
+      messages only, so a request is up to maxMessages + 1 messages
+- [ ] Consider pinning the system prompt per session: the prompt is
+      re-derived from the current AgentConfig on every continue, so
+      changing systemPrompt/workingDirectory between sessions re-prompts
+      old history with the new instructions
+- [ ] Consider per-session prompt overrides (prompt is always
+      config-driven today; no way to store a custom prompt with a session)
+- [ ] Consolidate system-message handling: the Agent prepends the system
+      message after truncation, so SimpleContextManager's internal
+      system-preservation logic is now only defensive (for histories that
+      already contain system messages)
 
-## Known limitations (from the M3 report)
+## Unresolved Milestone 3 follow-ups (still genuine)
 
 - [ ] Consider token-aware context limits
       (policy is message-count based; no token-counting infra yet)
@@ -45,6 +53,8 @@ M tests/AgentToolLoop.test.ts
 
 ## Constraints to respect
 
-- [ ] Do not start Milestone 4 until its brief is provided
-- [ ] File tools remain untouched by context work
-- [ ] Keep context policy provider-independent
+- [ ] Do not start Milestone 5 until its brief is provided
+- [ ] No terminal/shell execution, multi-agent behavior, long-term
+      semantic memory, RAG, or embeddings until explicitly briefed
+- [ ] File-tool behavior must remain unchanged by identity work
+- [ ] Keep system-prompt handling provider-independent

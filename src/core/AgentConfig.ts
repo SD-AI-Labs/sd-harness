@@ -26,4 +26,11 @@ export interface AgentConfig {
    * Conversation history policy applied before each LLM request.
    */
   contextPolicy: ContextPolicy;
+
+  /**
+   * System instructions establishing the agent's identity and behavior.
+   * Sent to the LLM as a system message on every request and kept out of
+   * persisted conversation history.
+   */
+  systemPrompt: string;
 }
